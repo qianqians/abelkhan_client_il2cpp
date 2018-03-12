@@ -168,7 +168,43 @@ namespace client
 			return true;
 		}
 
-		public void cancle_server()
+        public bool connect_server_ipv6(String tcp_ip, short tcp_port)
+        {
+            try
+            {
+                is_reconnect = false;
+
+                tcp_ch = _conn.connect_ipv6(tcp_ip, tcp_port);
+                _client_call_gate = new caller.client_call_gate(tcp_ch);
+                _client_call_gate.connect_server(uuid, service.timerservice.Tick);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool connect_server_dns(String tcp_ip, short tcp_port)
+        {
+            try
+            {
+                is_reconnect = false;
+
+                tcp_ch = _conn.connect_dns(tcp_ip, tcp_port);
+                _client_call_gate = new caller.client_call_gate(tcp_ch);
+                _client_call_gate.connect_server(uuid, service.timerservice.Tick);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public void cancle_server()
 		{
 			_client_call_gate.cancle_server();
 		}

@@ -39,7 +39,50 @@ namespace service
 			}
         }
 
-		public delegate void ChannelDisconnectHandle(juggle.Ichannel ch);
+        public juggle.Ichannel connect_ipv6(String ip, short port)
+        {
+            try
+            {
+                Socket s = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+                s.Connect(new IPEndPoint(System.Net.IPAddress.Parse(ip), port));
+
+                channel ch = new channel(s);
+                ch.onDisconnect += this.onChannelDisconn;
+
+                process_.reg_channel(ch);
+
+                return ch;
+            }
+            catch (System.Net.Sockets.SocketException e)
+            {
+                log.log.error(new System.Diagnostics.StackFrame(true), timerservice.Tick, "System.Net.Sockets.SocketException:{0}", e);
+
+                return null;
+            }
+            catch (System.Exception e)
+            {
+                log.log.error(new System.Diagnostics.StackFrame(true), timerservice.Tick, "System.Exceptio:{0}", e);
+
+                return null;
+            }
+        }
+
+        public juggle.Ichannel connect_dns(String host, short port)
+        {
+            IPHostEntry IpEntry = Dns.GetHostEntry(host);
+            if (IpEntry.AddressList[0].AddressFamily == AddressFamily.InterNetwork)
+            {
+                return connect(IpEntry.AddressList[0].ToString(), port);
+            }
+            else if (IpEntry.AddressList[0].AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                return connect_ipv6(IpEntry.AddressList[0].ToString(), port);
+            }
+
+            return null;
+        }
+
+        public delegate void ChannelDisconnectHandle(juggle.Ichannel ch);
 		public event ChannelDisconnectHandle onChannelDisconnect;
 
 		public void onChannelDisconn(channel ch)
