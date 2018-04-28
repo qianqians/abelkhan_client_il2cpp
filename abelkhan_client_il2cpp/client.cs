@@ -9,9 +9,11 @@ namespace client
         public delegate void onDisConnectHandle();
         public event onDisConnectHandle onDisConnect;
 
-        public client()
+        public client(byte _xor_key)
 		{
-			uuid = System.Guid.NewGuid().ToString();
+            xor_key = _xor_key;
+
+            uuid = System.Guid.NewGuid().ToString();
 			timer = new service.timerservice();
 			modulemanager = new common.modulemanager();
 
@@ -122,6 +124,16 @@ namespace client
             }
         }
 
+        private juggle.Ichannel onConnect(juggle.Ichannel ch)
+        {
+            var _ch = ch as service.channel;
+
+            _ch.compress_and_encrypt = (byte[] input) => { return common.compress_and_encrypt.CompressAndEncrypt(input, xor_key); };
+            _ch.unencrypt_and_uncompress = (byte[] input) => { return common.compress_and_encrypt.UnEncryptAndUnCompress(input, xor_key); };
+
+            return _ch;
+        }
+
         private void on_call_client(String module_name, String func_name, ArrayList argvs)
 		{
 			modulemanager.process_module_mothed(module_name, func_name, argvs);
@@ -138,7 +150,7 @@ namespace client
                 log.log.operation(new System.Diagnostics.StackFrame(), service.timerservice.Tick, "uuid:{0}", uuid);
                 is_reconnect = true;
 
-                tcp_ch = _conn.connect(tcp_ip, tcp_port);
+                tcp_ch = onConnect(_conn.connect(tcp_ip, tcp_port));
                 _client_call_gate = new caller.client_call_gate(tcp_ch);
                 _client_call_gate.connect_server(uuid, service.timerservice.Tick);
             }
@@ -156,7 +168,7 @@ namespace client
 			{
                 is_reconnect = false;
 
-                tcp_ch = _conn.connect(tcp_ip, tcp_port);
+                tcp_ch = onConnect(_conn.connect(tcp_ip, tcp_port));
 				_client_call_gate = new caller.client_call_gate(tcp_ch);
 				_client_call_gate.connect_server(uuid, service.timerservice.Tick);
             }
@@ -255,24 +267,7 @@ namespace client
             return tick;
         }
 
-        private static void Main()
-        {
-            client _client = new client();
-
-            Int64 old_tick = 0;
-            Int64 tick = 0;
-            while (true)
-            {
-                old_tick = tick;
-                tick = _client.poll();
-                
-                Int64 ticktime = (tick - old_tick);
-                if (ticktime < 100)
-                {
-                    Thread.Sleep(15);
-                }
-            }
-        }
+        public byte xor_key;
 
         public String uuid;
 		public service.timerservice timer;

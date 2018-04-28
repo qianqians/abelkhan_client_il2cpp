@@ -11,13 +11,19 @@ namespace service
 		public delegate void onDisconnectHandle(channel ch);
 		public event onDisconnectHandle onDisconnect;
 
-		public channel(Socket _s)
+        public delegate void DisconnectHandle(channel ch);
+        public event DisconnectHandle Disconnect;
+
+        public Func<byte[], byte[]> compress_and_encrypt = null;
+        public Func<byte[], byte[]> unencrypt_and_uncompress = null;
+
+        public channel(Socket _s)
 		{
 			s = _s;
 
 			que = new Queue();
 
-            recvbuflenght = 16 * 1024;
+            recvbuflenght = 8 * 1024;
             recvbuf = new byte[recvbuflenght];
             
             tmpbuf = null;
@@ -26,12 +32,40 @@ namespace service
             _send_state = send_state.idel;
             send_buff = new Queue();
 
-            s.BeginReceive(recvbuf, 0, recvbuflenght, 0, new AsyncCallback(this.onRead), this);
-		}
+            try
+            {
+                s.BeginReceive(recvbuf, 0, recvbuflenght, 0, new AsyncCallback(this.onRead), this);
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                log.log.error(new System.Diagnostics.StackFrame(true), timerservice.Tick, "SocketException");
+
+                if (onDisconnect != null)
+                {
+                    onDisconnect(this);
+                }
+            }
+            catch (System.Exception e)
+            {
+                log.log.error(new System.Diagnostics.StackFrame(true), timerservice.Tick, "System.Exception:{0}", e);
+
+                s.Close();
+
+                if (onDisconnect != null)
+                {
+                    onDisconnect(this);
+                }
+            }
+        }
 
         public void disconnect()
         {
             s.Close();
+
+            if (Disconnect != null)
+            {
+                Disconnect(this);
+            }
         }
 
 		private void onRead(IAsyncResult ar)
@@ -77,7 +111,12 @@ namespace service
                         MemoryStream _tmp = new MemoryStream();
                         _tmp.Write(data, offset, len);
                         _tmp.Position = 0;
-                        var json = System.Text.Encoding.UTF8.GetString(_tmp.ToArray());
+                        byte[] _tmp_data = _tmp.ToArray();
+                        if (unencrypt_and_uncompress != null)
+                        {
+                            _tmp_data = unencrypt_and_uncompress(_tmp_data);
+                        }
+                        var json = System.Text.Encoding.UTF8.GetString(_tmp_data);
                         log.log.trace(new System.Diagnostics.StackFrame(true), timerservice.Tick, "len:{0} msg:{1}", len, json);
                         try
                         {
@@ -119,6 +158,11 @@ namespace service
             catch (System.ObjectDisposedException )
             {
                 log.log.error(new System.Diagnostics.StackFrame(true), timerservice.Tick, "socket is release");
+
+                if (onDisconnect != null)
+                {
+                    onDisconnect(this);
+                }
             }
             catch (System.Net.Sockets.SocketException)
             {
@@ -166,7 +210,11 @@ namespace service
                 log.log.trace(new System.Diagnostics.StackFrame(), timerservice.Tick, "send:{0}", _tmp);
 
                 var _tmpdata = System.Text.Encoding.UTF8.GetBytes(_tmp);
-                var _tmplenght = _tmpdata.Length + 4;
+                if (compress_and_encrypt != null)
+                {
+                    _tmpdata = compress_and_encrypt(_tmpdata);
+                }
+                var _tmplenght = _tmpdata.Length;
                     
                 var st = new MemoryStream();
                 st.WriteByte((byte)(_tmplenght & 0xff));
@@ -174,10 +222,6 @@ namespace service
                 st.WriteByte((byte)((_tmplenght >> 16) & 0xff));
                 st.WriteByte((byte)((_tmplenght >> 24) & 0xff));
                 st.Write(_tmpdata, 0, _tmpdata.Length);
-                st.WriteByte(0);
-                st.WriteByte(0);
-                st.WriteByte(0);
-                st.WriteByte(0);
                 st.Position = 0;
 
                 senddata(st.ToArray());
@@ -232,18 +276,18 @@ namespace service
 
                 lock (send_buff)
                 {
-                    if (send_buff.Count <= 0)
+                    send_len += send;
+                    if (send_len < tmp_send_buff.Length)
                     {
-                        _send_state = send_state.idel;
+                        s.BeginSend(tmp_send_buff, send_len, tmp_send_buff.Length - send_len, SocketFlags.None, new AsyncCallback(this.send_callback), this);
                     }
-                    else
+                    else if (send_len == tmp_send_buff.Length)
                     {
-                        send_len += send;
-                        if (send_len < tmp_send_buff.Length)
+                        if (send_buff.Count <= 0)
                         {
-                            s.BeginSend(tmp_send_buff, send_len, tmp_send_buff.Length - send_len, SocketFlags.None, new AsyncCallback(this.send_callback), this);
+                            _send_state = send_state.idel;
                         }
-                        else if (send_len == tmp_send_buff.Length)
+                        else
                         {
                             var data = (byte[])send_buff.Dequeue();
                             tmp_send_buff = data;

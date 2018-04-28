@@ -37,9 +37,16 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>..\packages\SharpZipLib.0.86.0\lib\11\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\compress_and_encrypt\compress_and_encrypt.cs">
+      <Link>compress_and_encrypt.cs</Link>
+    </Compile>
     <Compile Include="..\protcol\c#\caller\client_call_gatecaller.cs">
       <Link>client_call_gatecaller.cs</Link>
     </Compile>
@@ -78,6 +85,9 @@
     <Compile Include="modulemanager.cs" />
     <Compile Include="process.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
