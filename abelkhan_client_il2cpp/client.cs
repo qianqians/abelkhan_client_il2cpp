@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections;
-using System.Threading;
+using System.Collections.Generic;
 
 namespace client
 {
@@ -25,8 +25,15 @@ namespace client
             _gate_call_client.onack_heartbeats += on_ack_heartbeats;
             _gate_call_client.oncall_client += on_call_client;
 			_process.reg_module(_gate_call_client);
-			_conn = new service.connectnetworkservice(_process);
+
+            _hub_call_client = new module.hub_call_client();
+            _hub_call_client.oncall_client += on_call_client;
+            _process.reg_module(_hub_call_client);
+
+            _conn = new service.connectnetworkservice(_process);
             _conn.onChannelDisconnect += on_disconnect;
+
+            direct_caller_hub = new Dictionary<string, direct_caller>();
 
             _juggleservice = new service.juggleservice();
             _juggleservice.add_process(_process);
@@ -151,7 +158,28 @@ namespace client
             return true;
         }
 
-		public bool connect_server(String tcp_ip, short tcp_port)
+        public bool direct_connect_server(String hub_name, String tcp_ip, short tcp_port)
+        {
+            try
+            {
+                var dirsct_ch = onConnect(_conn.connect(tcp_ip, tcp_port));
+                var _client_call_hub = new caller.client_call_hub(dirsct_ch);
+                _client_call_hub.client_connect(uuid);
+
+                var _direct_caller = new direct_caller();
+                _direct_caller.dirsct_ch = dirsct_ch;
+                _direct_caller._client_call_hub = _client_call_hub;
+                direct_caller_hub.Add(hub_name, _direct_caller);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool connect_server(String tcp_ip, short tcp_port)
 		{
 			try
 			{
@@ -233,6 +261,13 @@ namespace client
                 _argvs_list.Add(o);
             }
 
+            if (direct_caller_hub.ContainsKey(hub_name))
+            {
+                log.log.operation(new System.Diagnostics.StackFrame(), service.timerservice.Tick, "direct call hub");
+                direct_caller_hub[hub_name]._client_call_hub.call_hub(uuid, module_name, func_name, _argvs_list);
+                return;
+            }
+
             _client_call_gate.forward_client_call_hub(hub_name, module_name, func_name, _argvs_list);
         }
 
@@ -259,6 +294,14 @@ namespace client
         private juggle.Ichannel tcp_ch;
 		private module.gate_call_client _gate_call_client;
 		private caller.client_call_gate _client_call_gate;
+
+        private module.hub_call_client _hub_call_client;
+        class direct_caller
+        {
+            public juggle.Ichannel dirsct_ch;
+            public caller.client_call_hub _client_call_hub;
+        }
+        private Dictionary<string, direct_caller> direct_caller_hub;
 
         private bool connect_state;
         private bool is_reconnect;
