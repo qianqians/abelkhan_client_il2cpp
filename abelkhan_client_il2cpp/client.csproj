@@ -54,9 +54,6 @@
     <Compile Include="..\protcol\c#\caller\client_call_hubcaller.cs">
       <Link>client_call_hubcaller.cs</Link>
     </Compile>
-    <Compile Include="..\protcol\c#\module\hub_call_clientmodule.cs">
-      <Link>hub_call_clientmodule.cs</Link>
-    </Compile>
     <Compile Include="..\service\channel.cs">
       <Link>channel.cs</Link>
     </Compile>
@@ -86,6 +83,7 @@
     </Compile>
     <Compile Include="client.cs" />
     <Compile Include="gate_call_clientmodule.cs" />
+    <Compile Include="hub_call_clientmodule.cs" />
     <Compile Include="Imodule.cs" />
     <Compile Include="log.cs" />
     <Compile Include="module.cs" />
